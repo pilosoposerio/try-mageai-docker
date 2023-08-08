@@ -1,0 +1,48 @@
+name: mage-infra
+services:
+  web:
+    image: mageai/mageai:latest
+    command: sh -c "/app/run_app.sh mage start projects --instance-type web_server" 
+    ports:
+      - 6789:6789
+    working_dir: /home/mage_code
+    volumes:
+      - ../mage_code:/home/mage_code
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      MAGE_DATABASE_CONNECTION_URL: "postgresql+psycopg2://${POSTGRES_USER:-mageuser}:${POSTGRES_PASSWORD:-magepassword}@db:5432/${POSTGRES_DB:-magedb}"
+      REDIS_URL: redis://redis:6379/0
+  scheduler:
+    image: mageai/mageai:latest
+    command: sh -c "/app/run_app.sh mage start projects --instance-type scheduler"
+    working_dir: /home/mage_code
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      web:
+        condition: service_started 
+    environment:
+      MAGE_DATABASE_CONNECTION_URL: "postgresql+psycopg2://${POSTGRES_USER:-mageuser}:${POSTGRES_PASSWORD:-magepassword}@db:5432/${POSTGRES_DB:-magedb}"
+      REDIS_URL: redis://redis:6379/0
+  db:
+    image: postgres:13-alpine3.17
+    volumes:
+      - ../pg_data:/data/postgres
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-mageuser}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-magepassword}"
+      POSTGRES_DB: "${POSTGRES_DB:-magedb}"
+      PGDATA: /data/postgres
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U ${POSTGRES_USER:-mageuser} -d ${POSTGRES_DB:-magedb}'"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  redis:
+    image: redis:latest
