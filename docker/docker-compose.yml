@@ -5,31 +5,38 @@ services:
     command: sh -c "/app/run_app.sh mage start projects --instance-type web_server" 
     ports:
       - 6789:6789
-    working_dir: /home/mage_code
     volumes:
-      - ../mage_code:/home/mage_code
+      - ../mage_code:/home/src
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     environment:
       MAGE_DATABASE_CONNECTION_URL: "postgresql+psycopg2://${POSTGRES_USER:-mageuser}:${POSTGRES_PASSWORD:-magepassword}@db:5432/${POSTGRES_DB:-magedb}"
       REDIS_URL: redis://redis:6379/0
+      ULIMIT_NO_FILE: 8192
+    # healthcheck:
+    #   test: ["CMD", "curl", "--fail", "http://127.0.0.1:6789/", "||", "exit", "1"]
+    #   interval: 10s
+    #   timeout: 10s
+    #   retries: 5
   scheduler:
     image: mageai/mageai:latest
     command: sh -c "/app/run_app.sh mage start projects --instance-type scheduler"
-    working_dir: /home/mage_code
+    volumes:
+      - ../mage_code:/home/src
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       web:
         condition: service_started 
     environment:
       MAGE_DATABASE_CONNECTION_URL: "postgresql+psycopg2://${POSTGRES_USER:-mageuser}:${POSTGRES_PASSWORD:-magepassword}@db:5432/${POSTGRES_DB:-magedb}"
       REDIS_URL: redis://redis:6379/0
+      ULIMIT_NO_FILE: 8192
   db:
     image: postgres:13-alpine3.17
     volumes:
